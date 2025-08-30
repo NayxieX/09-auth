@@ -7,7 +7,7 @@ import SearchBox from "@/components/SearchBox/SearchBox";
 import Pagination from "@/components/Pagination/Pagination";
 import { useQuery } from "@tanstack/react-query";
 import { useDebounce } from "use-debounce";
-import { fetchNotes } from "@/lib/api";
+import { fetchNotes } from "@/lib/api/clientApi";
 import { Note } from "@/types/note";
 import Link from "next/link";
 import { toast } from "react-hot-toast";

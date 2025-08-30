@@ -1,5 +1,5 @@
-import { fetchNotes } from "@/lib/api";
-import NotesClient from "@/app/notes/filter/[...slug]/Notes.client";
+import { fetchNotes } from "@/lib/api/serverApi";
+import NotesClient from "./Notes.client";
 import { tagOptions, Tag } from "@/types/note";
 import { Metadata } from "next";
 
