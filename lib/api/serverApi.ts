@@ -51,16 +51,15 @@ function handleAxiosError(error: unknown, defaultMessage: string): never {
 
 export async function withAuthHeaders() {
   const cookieStore = await cookies();
-  const cookieHeader = cookieStore
-    .getAll()
-    .map((c) => `${c.name}=${c.value}`)
-    .join("; ");
+  const accessToken = cookieStore.get("accessToken")?.value;
+  const refreshToken = cookieStore.get("refreshToken")?.value;
 
-  return {
-    headers: {
-      Cookie: cookieHeader,
-    },
-  };
+  const headers: Record<string, string> = {};
+
+  if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
+  if (refreshToken) headers["x-refresh-token"] = refreshToken;
+
+  return { headers };
 }
 
 export async function signUp(payload: { username: string; password: string }) {
