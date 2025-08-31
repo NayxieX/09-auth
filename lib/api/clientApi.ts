@@ -1,6 +1,6 @@
 import { Note, NoteTag } from "@/types/note";
 import { api } from "./api";
-import { User, UserInfo } from "@/types/user";
+import { User } from "@/types/user";
 import { AxiosError } from "axios";
 
 // ==== Types ====
@@ -9,7 +9,12 @@ export interface FetchNotesParams {
   page?: number;
   perPage?: number;
   search?: string;
-  tag?: NoteTag;
+  tag?: NoteTag | "All";
+}
+
+export interface UserInfo {
+  isAuth: boolean;
+  user?: User;
 }
 
 export interface FetchNotesResponse {
@@ -56,6 +61,7 @@ export const checkServerSession = async (
       headers: { Cookie: cookieHeader || "" },
       withCredentials: true,
     });
+
     return data || null;
   } catch {
     return null;
@@ -79,7 +85,10 @@ export async function loginUser(
 
 export async function register(email: string, password: string): Promise<User> {
   try {
-    const { data } = await api.post<User>("/auth/register", { email, password });
+    const { data } = await api.post<User>("/auth/register", {
+      email,
+      password,
+    });
     return data;
   } catch (error: unknown) {
     if (error instanceof AxiosError && error.response?.status === 409) {
@@ -128,25 +137,26 @@ export async function updateUserProfile(payload: Partial<User>): Promise<User> {
 
 export const createNote = async (note: CreateNoteDto): Promise<Note> => {
   try {
-    const { data } = await api.post<Note>("/notes", note); 
+    const { data } = await api.post<Note>("/notes", note);
     return data;
   } catch (error: unknown) {
     handleAxiosError(error, "Не удалось создать заметку");
   }
 };
 
-export const deleteNote = async (id: string) => {
+export const deleteNote = async (id: string): Promise<Note> => {
   try {
-    const response = await api.delete<{ success: boolean }>(`/notes/${id}`);
-    return response.data;
+    const { data } = await api.delete<Note>(`/notes/${id}`);
+    return data;
   } catch (error: unknown) {
     handleAxiosError(error, "Не удалось удалить заметку");
+    throw new Error("Не змогли видалити ноут");
   }
 };
 
 export const fetchNoteById = async (id: string): Promise<Note> => {
   try {
-    const { data } = await api.get<Note>(`/${id}`);
+    const { data } = await api.get<Note>(`/notes/${id}`);
     return data;
   } catch (error: unknown) {
     handleAxiosError(error, "Не удалось загрузить заметку");
@@ -159,17 +169,17 @@ export const fetchNotes = async ({
   search = "",
   tag,
 }: FetchNotesParams = {}): Promise<FetchNotesResponse> => {
-  try {
-    const params: Record<string, string | number> = {
-      page,
-      perPage,
-      ...(search.trim() && { search }),
-      ...(tag && (tag as string) !== "All" && { tag }),
-    };
+  const params: Record<string, string | number> = {
+    page,
+    perPage,
+    ...(search.trim() && { search }),
+    ...(tag && tag !== "All" && { tag }),
+  };
 
-    const { data } = await api.get<FetchNotesResponse>("/notes", { params });
-    return data;
-  } catch (error: unknown) {
-    handleAxiosError(error, "Не удалось загрузить список заметок");
-  }
+  const { data } = await api.get<FetchNotesResponse>("/notes", {
+    params,
+    withCredentials: true, 
+  });
+  return data;
 };
+

@@ -2,6 +2,7 @@ import { api } from "./api";
 import { Note, NoteTag } from "@/types/note";
 import { User } from "@/types/user";
 import { cookies } from "next/headers";
+import { AxiosError } from "axios";
 
 // ==== Types ====
 
@@ -14,13 +15,36 @@ export interface FetchNotesParams {
   page?: number;
   perPage?: number;
   search?: string;
-  tag?: NoteTag;
+  tag?: NoteTag | "All";
 }
 
 export interface CreateNoteDto {
   title: string;
   content: string;
   tag: NoteTag;
+}
+
+// ==== Custom Error ====
+
+export class AuthError extends Error {
+  code: number;
+
+  constructor(code: number, message: string) {
+    super(message);
+    this.code = code;
+    this.name = "AuthError";
+  }
+}
+
+// ==== Helpers ====
+
+function handleAxiosError(error: unknown, defaultMessage: string): never {
+  if (error instanceof AxiosError) {
+    const code = error.response?.status || 500;
+    const message = error.response?.data?.message || defaultMessage;
+    throw new AuthError(code, message);
+  }
+  throw new AuthError(500, defaultMessage);
 }
 
 // ==== Sign Up/In/Out ====
@@ -70,12 +94,8 @@ export async function refreshSession(refreshToken: string) {
   return data;
 }
 
-export async function checkSession(): Promise<{ isAuth: boolean }> {
-  const { data } = await api.get<{ isAuth: boolean }>(
-    "/auth/session",
-    await withAuthHeaders()
-  );
-  return data;
+export async function checkSession() {
+  return api.get<{ isAuth: boolean }>("/auth/session", await withAuthHeaders());
 }
 
 export async function getProfile(): Promise<User> {
@@ -97,39 +117,58 @@ export async function updateUserProfile(payload: {
 // ==== API Methods ====
 
 export const createNote = async (note: CreateNoteDto): Promise<Note> => {
-  const { data } = await api.post<Note>("/", note);
-  return data;
+  try {
+    const { data } = await api.post<Note>(
+      "/notes",
+      note,
+      await withAuthHeaders()
+    );
+    return data;
+  } catch (error: unknown) {
+    handleAxiosError(error, "Не удалось создать заметку");
+  }
 };
 
-export const deleteNote = async (id: string) => {
-  const response = await api.delete<{ success: boolean }>(`/notes/${id}`);
-  return response.data;
+export const deleteNote = async (id: string): Promise<Note> => {
+  try {
+    const { data } = await api.delete<Note>(
+      `/notes/${id}`,
+      await withAuthHeaders()
+    );
+    return data;
+  } catch (error: unknown) {
+    handleAxiosError(error, "Не удалось удалить заметку");
+  }
 };
 
 export const fetchNoteById = async (id: string): Promise<Note> => {
-  const { data } = await api.get<Note>(`/${id}`);
-  return data;
+  try {
+    const { data } = await api.get<Note>(
+      `/notes/${id}`,
+      await withAuthHeaders()
+    );
+    return data;
+  } catch (error: unknown) {
+    handleAxiosError(error, "Не удалось загрузить заметку");
+  }
 };
 
-export const fetchNotes = async ({
-  page = 1,
-  perPage = 12,
-  search = "",
-  tag,
-}: FetchNotesParams = {}): Promise<FetchNotesResponse> => {
-  const params: Record<string, string | number> = {
-    page,
+export const fetchNotes = async (
+  params: FetchNotesParams = {}
+): Promise<FetchNotesResponse> => {
+  const { page = 1, perPage = 12, search, tag } = params;
+
+  const queryParams: Record<string, string | number> = {
+    page: Math.max(Number(page), 1),
     perPage,
-    ...(search.trim() && { search }),
-    ...(tag && (tag as string) !== "All" && { tag }),
+    ...(search?.trim() && { search }),
+    ...(tag && tag !== "All" && { tag }),
   };
 
-  const headers = await withAuthHeaders();
-
-  const { data } = await api.get<FetchNotesResponse>("/notes", {
-    params,
-    ...headers,
+  const response = await api.get<FetchNotesResponse>("/notes", {
+    params: queryParams,
+    ...(await withAuthHeaders()),
   });
 
-  return data;
+  return response.data;
 };

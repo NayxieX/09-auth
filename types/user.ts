@@ -4,7 +4,3 @@ export interface User {
   avatar: string;
 }
 
-export interface UserInfo {
-  isAuth: boolean;
-  user?: User;
-}
